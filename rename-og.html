@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JPIN Image Renamer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --zoho-blue:#1D7BF7;
+    --zoho-blue-dark:#0B5FD1;
+    --zoho-teal:#089949;
+    --zoho-red:#E42527;
+    --bg:#F5F6F8;
+    --panel:#FFFFFF;
+    --border:#E1E5EA;
+    --text:#1F2A3D;
+    --muted:#6B7686;
+    --sidebar:#1B2A4A;
+    --sidebar-hover:#25396B;
+    --sans:'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;}
+  .app{display:flex;min-height:100vh;}
+  .sidebar{width:64px;background:var(--sidebar);color:#cfd9ef;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:18px 0;gap:22px;}
+  .sidebar .logo{width:34px;height:34px;border-radius:8px;background:var(--zoho-blue);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px;}
+  .sidebar .icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#a9b7d6;cursor:pointer;}
+  .sidebar .icon.active{background:var(--sidebar-hover);color:#fff;}
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topbar{background:var(--panel);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;}
+  .topbar .crumb{font-size:13px;color:var(--muted);}
+  .topbar .crumb b{color:var(--text);font-weight:600;}
+  .content{padding:22px 28px 60px;max-width:1180px;margin:0 auto;width:100%;}
+  .page-title{font-size:20px;font-weight:700;margin:0 0 2px;}
+  .page-sub{color:var(--muted);font-size:13px;margin:0 0 22px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(20,30,50,0.03);}
+  .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
+  .card-head-left{display:flex;align-items:center;gap:10px;}
+  .step-num{width:22px;height:22px;border-radius:50%;background:var(--zoho-blue);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .card-head h2{font-size:14px;margin:0;font-weight:600;color:var(--text);}
+  label{font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;}
+  input[type=text]{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:6px;font-size:13.5px;background:#FBFCFD;color:var(--text);}
+  input[type=text]:focus{outline:none;border-color:var(--zoho-blue);box-shadow:0 0 0 3px rgba(29,123,247,0.12);}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;}
+  .row > div{flex:1;min-width:220px;}
+  .drop{border:1.5px dashed var(--border);border-radius:8px;padding:30px 20px;text-align:center;cursor:pointer;transition:border-color .15s, background .15s;background:#FAFBFC;}
+  .drop:hover,.drop.drag{border-color:var(--zoho-blue);background:#F0F7FF;}
+  .drop input{display:none;}
+  .drop .hint{font-size:12px;color:var(--muted);margin-top:6px;}
+  .drop-icon{font-size:26px;margin-bottom:6px;}
+  button{font-family:var(--sans);font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;}
+  button.primary{background:var(--zoho-blue);border-color:var(--zoho-blue-dark);color:#fff;}
+  button.primary:hover:not(:disabled){background:var(--zoho-blue-dark);}
+  button:disabled{opacity:0.45;cursor:not-allowed;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{border-bottom:1px solid var(--border);padding:9px 10px;text-align:left;vertical-align:top;}
+  th{background:#F8F9FB;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;position:sticky;top:0;font-weight:700;}
+  tbody tr:hover{background:#F7FAFF;}
+  td[contenteditable]{background:#FFFDF2;}
+  td[contenteditable]:focus{outline:2px solid var(--zoho-blue);outline-offset:-2px;background:#fff;}
+  .table-scroll{max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:6px;}
+  .status{font-size:12.5px;margin-top:12px;color:var(--muted);}
+  .bar-outer{height:8px;background:#EDEFF3;border-radius:5px;overflow:hidden;margin-top:10px;}
+  .bar-inner{height:100%;width:0%;background:linear-gradient(90deg,var(--zoho-blue),var(--zoho-teal));transition:width .2s;}
+  .pill{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;}
+  .pill.ok{background:#E5F8ED;color:var(--zoho-teal);}
+  .pill.fail{background:#FDE9E9;color:var(--zoho-red);}
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .note{font-size:12.5px;color:var(--muted);background:#F4F6FA;border-left:3px solid var(--zoho-blue);padding:10px 12px;border-radius:4px;margin-top:14px;}
+  footer{text-align:center;font-size:11.5px;color:var(--muted);margin-top:30px;}
+</style>
+</head>
+<body>
+<div class="app" id="appShell">
+  <div class="sidebar">
+    <div class="logo">JR</div>
+    <div class="icon active" data-tab="tool">&#9635;</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb"><b>Image Tools</b> &nbsp;/&nbsp; JPIN Image Renamer</div>
+    </div>
+
+    <div class="content" id="tabTool">
+      <h1 class="page-title">JPIN Image Renamer</h1>
+      <p class="page-sub">Upload a workbook, review rows, download renamed images and a status report.</p>
+
+      <div class="card">
+        <div class="card-head"><div class="card-head-left"><span class="step-num">1</span><h2>Upload workbook</h2></div></div>
+        <div class="drop" id="dropZone">
+          <div class="drop-icon">&#128228;</div>
+          <div id="dropLabel">Drop your <strong>.xlsx</strong> file here, or click to choose</div>
+          <div class="hint">Needs columns: JPIN, JPIN Status, Image 1, Image 2, ...</div>
+          <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-head-left"><span class="step-num">2</span><h2>Settings</h2></div></div>
+        <div class="row">
+          <div>
+            <label>S3 base URL</label>
+            <input type="text" id="s3base" value="https://jtctimages.s3.ap-south-1.amazonaws.com">
+          </div>
+        </div>
+        <div class="checkline">
+          <input type="checkbox" id="proxyToggle">
+          <label for="proxyToggle">Use public CORS proxy fallback for blocked image hosts</label>
+        </div>
+      </div>
+
+      <div class="card" id="previewPanel" style="display:none;">
+        <div class="card-head"><div class="card-head-left"><span class="step-num">3</span><h2>Preview &amp; fix rows</h2></div></div>
+        <div class="table-scroll"><div id="previewTable"></div></div>
+        <div class="note">Click any cell to correct a value before generating. Rows missing JPIN or JPIN Status will fail.</div>
+      </div>
+
+      <div class="card" id="runPanel" style="display:none;">
+        <div class="card-head"><div class="card-head-left"><span class="step-num">4</span><h2>Generate</h2></div></div>
+        <button class="primary" id="generateBtn">Generate images + report</button>
+        <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+        <div class="status" id="statusText"></div>
+      </div>
+
+      <div class="card" id="resultsPanel" style="display:none;">
+        <div class="card-head"><div class="card-head-left"><span class="step-num">5</span><h2>Results</h2></div></div>
+        <div class="table-scroll"><div id="resultsTable"></div></div>
+        <div class="actions">
+          <button class="primary" id="downloadZip">Download ZIP (images + report)</button>
+          <button id="downloadCsv">Download report CSV only</button>
+        </div>
+      </div>
+
+      <footer>Folder links (Dropbox / Google Drive folders) are not supported here — direct image URLs and single-file Dropbox links only.</footer>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { rows: [], imageCols: [], results: [], zipBlob: null, csvText: null };
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('click', ()=>fileInput.click());
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e=>{
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function handleFile(file){
+  document.getElementById('dropLabel').innerHTML = `Loaded: <strong>${file.name}</strong>`;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet, { defval:'' });
+    if (!json.length){ alert('No rows found in the first sheet.'); return; }
+
+    const headers = Object.keys(json[0]).map(h => h.trim());
+    const imageCols = headers.filter(h => h.toLowerCase().startsWith('image '));
+    if (!headers.includes('JPIN') || !headers.includes('JPIN Status')){
+      alert('Missing required columns: JPIN and/or JPIN Status.');
+      return;
+    }
+
+    state.rows = json;
+    state.imageCols = imageCols.sort((a,b)=>{
+      const na = parseInt(a.replace(/\D/g,'')) || 0;
+      const nb = parseInt(b.replace(/\D/g,'')) || 0;
+      return na - nb;
+    });
+
+    renderPreview();
+    document.getElementById('previewPanel').style.display='block';
+    document.getElementById('runPanel').style.display='block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderPreview(){
+  const cols = ['JPIN','JPIN Status',...state.imageCols];
+  let html = '<table><thead><tr>' + cols.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  state.rows.forEach((row,ri)=>{
+    html += '<tr>' + cols.map(c=>`<td contenteditable="true" data-row="${ri}" data-col="${c}">${escapeHtml(row[c] ?? '')}</td>`).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('previewTable').innerHTML = html;
+  document.getElementById('previewTable').addEventListener('input', e=>{
+    const td = e.target;
+    if (td.dataset.row !== undefined){
+      state.rows[td.dataset.row][td.dataset.col] = td.textContent;
+    }
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function sanitizeJpin(j){
+  return String(j).replace(/[\\/*?:"<>|]/g, '');
+}
+
+function isFolderLink(url){
+  return /drive\.google\.com\/drive\/folders/i.test(url) || /dropbox\.com\/scl\/fo\//i.test(url) || /dropbox\.com\/sh\/.*\/folder/i.test(url);
+}
+
+function rewriteDropbox(url){
+  if (/dropbox\.com/i.test(url)){
+    return url.replace(/([?&])dl=[01]\b/i, '$1raw=1');
+  }
+  return url;
+}
+
+async function fetchWithRetry(url, useProxy, tries=3){
+  const target = useProxy ? `https://corsproxy.io/?${encodeURIComponent(url)}` : url;
+  let lastErr;
+  for (let i=0;i<tries;i++){
+    try{
+      const res = await fetch(target, { mode:'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('text/html')) throw new Error('Server returned an HTML page, not an image (likely an expired or private link).');
+      const blob = await res.blob();
+      return { blob, contentType: ct };
+    }catch(err){
+      lastErr = err;
+      await new Promise(r=>setTimeout(r, 400*(i+1)));
+    }
+  }
+  throw lastErr;
+}
+
+document.getElementById('generateBtn').addEventListener('click', runGeneration);
+
+async function runGeneration(){
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  const bar = document.getElementById('bar');
+  const statusText = document.getElementById('statusText');
+  const s3base = document.getElementById('s3base').value.replace(/\/$/, '');
+  const useProxy = document.getElementById('proxyToggle').checked;
+
+  const zip = new JSZip();
+  const imgFolder = zip.folder('Downloaded_Images');
+  const results = [];
+
+  let totalCells = 0;
+  state.rows.forEach(row => state.imageCols.forEach(c => { if (String(row[c]||'').trim() !== '') totalCells++; }));
+  let done = 0;
+
+  for (const row of state.rows){
+    const jpinRaw = row['JPIN'];
+    const statusRaw = row['JPIN Status'];
+
+    if (!jpinRaw || String(jpinRaw).trim() === '' || !statusRaw || String(statusRaw).trim() === ''){
+      state.imageCols.forEach((col, idx) => {
+        const url = String(row[col] || '').trim();
+        if (url === '') return;
+        done++;
+        results.push({
+          ColumnMeaning: col, JPIN: jpinRaw || '', 'JPIN Status': statusRaw || '',
+          'Image Number': idx+1, 'Source URL': url, 'Renamed File': '', 'S3 URL': '', 'WEBP S3 URL': '',
+          Result: 'FAILED', 'Failure Reason': 'Missing required JPIN or JPIN Status for this row.'
+        });
+      });
+      continue;
+    }
+
+    const jpin = sanitizeJpin(jpinRaw);
+    const version = String(statusRaw).trim().toLowerCase() === 'existing' ? 'V2' : 'V1';
+
+    for (let idx=0; idx<state.imageCols.length; idx++){
+      const col = state.imageCols[idx];
+      let url = String(row[col] || '').trim();
+      if (url === '') continue;
+
+      const n = idx + 1;
+      const baseRow = { ColumnMeaning: col, JPIN: jpin, 'JPIN Status': statusRaw, 'Image Number': n, 'Source URL': url };
+
+      done++;
+      bar.style.width = Math.round((done/Math.max(totalCells,1))*100) + '%';
+      statusText.textContent = `Processing ${jpin} — ${col} (${done}/${totalCells})...`;
+
+      if (isFolderLink(url)){
+        results.push({
+          ...baseRow,
+          'Renamed File':'',
+          'S3 URL':'',
+          'WEBP S3 URL':'',
+          Result:'FAILED',
+          'Failure Reason':'Folder links are not supported in the browser tool — use the local backend for Dropbox or Google Drive folders.'
+        });
+        continue;
+      }
+
+      url = rewriteDropbox(url);
+
+      try{
+        const { blob } = await fetchWithRetry(url, useProxy);
+        const filename = `${jpin}_IMG${n}${version}.jpg`;
+        imgFolder.file(filename, blob);
+
+        results.push({
+          ...baseRow,
+          'Renamed File': filename,
+          'S3 URL': `${s3base}/${filename}`,
+          'WEBP S3 URL': `${s3base}/${filename.replace(/\.jpg$/i, '.webp')}`,
+          Result: 'OK',
+          'Failure Reason': ''
+        });
+      }catch(err){
+        let reason = err.message || 'Unknown error';
+        if (/Failed to fetch/i.test(reason)) reason = 'Network/CORS block — this host refused the browser request. Try the proxy fallback toggle.';
+        results.push({
+          ...baseRow,
+          'Renamed File':'',
+          'S3 URL':'',
+          'WEBP S3 URL':'',
+          Result:'FAILED',
+          'Failure Reason': reason
+        });
+      }
+    }
+  }
+
+  state.results = results;
+  const csvText = toCsv(results);
+  state.csvText = csvText;
+  zip.file('report.csv', csvText);
+  state.zipBlob = await zip.generateAsync({ type:'blob' });
+
+  renderResults(results);
+  const okCount = results.filter(r=>r.Result==='OK').length;
+  const failCount = results.filter(r=>r.Result==='FAILED').length;
+  statusText.textContent = `Done. ${okCount} succeeded, ${failCount} failed.`;
+  document.getElementById('resultsPanel').style.display='block';
+  btn.disabled = false;
+}
+
+function toCsv(rows){
+  const cols = ['ColumnMeaning','JPIN','JPIN Status','Image Number','Source URL','Renamed File','S3 URL','WEBP S3 URL','Result','Failure Reason'];
+  const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const lines = [cols.join(',')];
+  rows.forEach(r => lines.push(cols.map(c => esc(r[c])).join(',')));
+  return lines.join('\r\n');
+}
+
+function renderResults(rows){
+  const cols = ['JPIN','Image Number','Renamed File','Result','Failure Reason'];
+  let html = '<table><thead><tr>' + cols.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>' + cols.map(c => {
+      if (c === 'Result') return `<td><span class="pill ${r[c]==='OK'?'ok':'fail'}">${r[c]}</span></td>`;
+      return `<td>${escapeHtml(r[c])}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('resultsTable').innerHTML = html;
+}
+
+document.getElementById('downloadZip').addEventListener('click', () => {
+  if (!state.zipBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(state.zipBlob);
+  a.download = 'jpin_images_and_report.zip';
+  a.click();
+});
+
+document.getElementById('downloadCsv').addEventListener('click', () => {
+  if (!state.csvText) return;
+  const blob = new Blob([state.csvText], { type:'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'report.csv';
+  a.click();
+});
+</script>
+</body>
+</html>
